@@ -216,17 +216,17 @@ void Mesh::buildBasisCycles()
     solver.compute(A);
 }
 
-double parallelTransport(double angle, HalfEdgeIter& he)
+double connectionAngle(double angle, HalfEdgeIter& he)
 {
     Eigen::Vector3d x, y;
     Eigen::Vector3d v = he->flip->vertex->position - he->vertex->position;
     if (he != he->edge->he) v = -v;
     
-    // subtract delta ij
+    // delta ij
     he->face->axis(x, y);
     double deltaIJ = atan2(v.dot(y), v.dot(x));
     
-    // subtract delta ji
+    // delta ji
     he->flip->face->axis(x, y);
     double deltaJI = atan2(v.dot(y), v.dot(x));
     
@@ -249,7 +249,7 @@ void Mesh::setup()
             // compute holonomy of the discrete Levi-Civita connection
             double alpha = 0;
             for (size_t j = 0; j < generators[i-v].size(); j++) {
-                alpha = parallelTransport(alpha, generators[i-v][j]);
+                alpha = connectionAngle(alpha, generators[i-v][j]);
             }
             
             while (alpha >=  M_PI) alpha -= 2 * M_PI;
@@ -282,7 +282,7 @@ void Mesh::constructDirectionFields()
             if (f2 != root && f2->parent == f2) {
                 f2->parent = f1;
                 double phi = he == he->edge->he ? he->edge->phi : -he->edge->phi;
-                f2->beta = parallelTransport(f1->beta, he) - phi;
+                f2->beta = connectionAngle(f1->beta, he) - phi;
                 queue.push(f2);
             }
             
