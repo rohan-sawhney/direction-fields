@@ -120,7 +120,6 @@ void drawBasisCycles()
 {
     // draw primal tree
     glColor4f(0.0, 0.0, 1.0, 0.5);
-    glLineWidth(3.0);
     glLineWidth(1.0);
     glBegin(GL_LINES);
     for (VertexCIter v = mesh.vertices.begin(); v != mesh.vertices.end(); v++){
@@ -168,7 +167,7 @@ void drawDirectionFields()
         Eigen::Vector3d start = f->centroid();
         Eigen::Vector3d end = start + f->field*avgEdgeLength * 0.75;
         
-        glLineWidth(1.5);
+        glLineWidth(1.0);
         glBegin(GL_LINES);
         glVertex3d(start.x(), start.y(), start.z());
         glVertex3d(end.x(), end.y(), end.z());
