@@ -20,6 +20,7 @@ double z = -2.5;
 std::string path = "/Users/rohansawhney/Desktop/developer/C++/direction-fields/kitten.obj";
     
 Mesh mesh;
+double avgEdgeLength = 0;
 bool success = true;
 bool showBasisCycles = true;
 bool setGeneratorIndices = false;
@@ -166,7 +167,7 @@ void drawDirectionFields()
     for (FaceIter f = mesh.faces.begin(); f != mesh.faces.end(); f++) {
 
         Eigen::Vector3d centroid = f->centroid();
-        Eigen::Vector3d direction = centroid + f->field*0.05;
+        Eigen::Vector3d direction = centroid + f->field*avgEdgeLength*0.5;
         glVertex3d(centroid.x(), centroid.y(), centroid.z());
         glVertex3d(direction.x(), direction.y(), direction.z());
     }
@@ -276,6 +277,10 @@ int main(int argc, char** argv) {
     success = mesh.read(path);
     assignRandomSingularities();
     mesh.solve(generatorKs);
+    for (EdgeCIter e = mesh.edges.begin(); e != mesh.edges.end(); e++) {
+        avgEdgeLength += e->length();
+    }
+    avgEdgeLength /= (double)mesh.edges.size();
     
     printInstructions();
     glutInitWindowSize(gridX, gridY);

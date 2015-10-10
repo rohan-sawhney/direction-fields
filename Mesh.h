@@ -7,6 +7,7 @@
 #include "Face.h"
 #include "HalfEdge.h"
 #include <Eigen/SparseCore>
+#include <Eigen/SPQRSupport>
 
 typedef std::vector<HalfEdgeIter> Cycle;
 
@@ -62,6 +63,7 @@ private:
     // sets up A and K 
     void setup();
 
+    Eigen::SPQR<Eigen::SparseMatrix<double>> solver;
     Eigen::SparseMatrix<double> A;
     Eigen::VectorXd K;
 };

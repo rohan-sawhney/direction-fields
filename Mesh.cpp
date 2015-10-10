@@ -1,8 +1,7 @@
 #include "Mesh.h"
 #include "MeshIO.h"
 #include <queue>
-#include <Eigen/SparseQR>
-#include <Eigen/IterativeLinearSolvers>
+
 #define EPSILON 10-6
 
 Mesh::Mesh()
@@ -162,7 +161,7 @@ void Mesh::buildNonContractibleCycles(std::vector<Cycle>& basisCycles)
                 f = fp;
             }
 
-            // remove comman edges
+            // remove common edges
             int t1 = (int)temp1.size()-1;
             int t2 = (int)temp2.size()-1;
             while (temp1[t1] == temp2[t2]) {
@@ -202,7 +201,7 @@ void Mesh::buildBasisCycles()
             HalfEdgeIter he = basisCycles[i][j];
             int e = he->edge->index;
             double coefficient = sqrt((he->cotan() + he->flip->cotan()) * 0.5);
-            if (coefficient != coefficient) coefficient = 0;
+            if (coefficient != coefficient) coefficient = 0; // check for negative cotan weights
             
             if (he == he->edge->he) {
                 ATriplet.push_back(Eigen::Triplet<double>(i, e, coefficient));
@@ -214,6 +213,7 @@ void Mesh::buildBasisCycles()
     }
 
     A.setFromTriplets(ATriplet.begin(), ATriplet.end());
+    solver.compute(A);
 }
 
 double parallelTransport(double angle, HalfEdgeIter& he)
@@ -278,20 +278,20 @@ void Mesh::solve(const std::vector<double>& generatorKs)
         std::cerr << "Error: Indices must add to Euler Characteristic" << std::endl;
         return;
     }
-    /*
+    
     // solve for adjustment angles
-    Eigen::SparseQR<Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int>> solver(A);
     Eigen::VectorXd x = solver.solve(b);
     
     // set adjustment angles
     for (EdgeIter e = edges.begin(); e != edges.end(); e++) {
         double coefficient = sqrt((e->he->cotan() + e->he->flip->cotan()) * 0.5);
-        if (coefficient != coefficient) coefficient = 0;
+        if (coefficient != coefficient) coefficient = 0; // check for negative cotan weights
         e->phi = x(e->index) * coefficient;
     }
     
     // construct direction fields
     FaceIter root = faces.begin() + (rand() % faces.size());
+    root->visited = true;
     root->beta = M_PI;
     std::queue<FaceIter> queue;
     queue.push(root);
@@ -300,13 +300,12 @@ void Mesh::solve(const std::vector<double>& generatorKs)
         FaceIter f = queue.front();
         queue.pop();
         
-        f->visited = true;
-        
         HalfEdgeIter he = f->he;
         do {
             FaceIter neighbor = he->flip->face;
             if (!neighbor->visited) {
                 neighbor->beta = parallelTransport(f->beta, he->flip) - he->edge->phi;
+                neighbor->visited = true;
                 queue.push(neighbor);
             }
             
@@ -324,7 +323,6 @@ void Mesh::solve(const std::vector<double>& generatorKs)
         if (f->he != f->he->edge->he) n = -n;
         f->field = x*cos(f->beta) + n.cross(x)*sin(f->beta) + n*(n.dot(x))*(1-cos(f->beta));
     }
-    */
 }
 
 void Mesh::normalize()
