@@ -9,7 +9,7 @@
 #include <Eigen/SparseCore>
 #include <Eigen/SPQRSupport>
 
-typedef std::vector<HalfEdgeIter> Cycle;
+typedef std::vector<HalfEdgeIter> BasisCycle;
 
 class Mesh {
 public:
@@ -39,14 +39,14 @@ public:
     std::vector<Edge> edges;
     std::vector<Face> faces;
     std::vector<HalfEdgeIter> boundaries;
-    std::vector<Cycle> generators;
+    std::vector<BasisCycle> generators;
     
 private:
     // center mesh about origin and rescale to unit radius
     void normalize();
     
     // builds contractible cycles
-    void buildContractibleCycles(std::vector<Cycle>& basisCycles);
+    void buildContractibleCycles(std::vector<BasisCycle>& basisCycles);
     
     // builds primal spanning tree for tree-cotree decomoposition
     void buildPrimalSpanningTree();
@@ -55,16 +55,18 @@ private:
     void buildDualSpanningTree();
     
     // builds non contractible cycles
-    void buildNonContractibleCycles(std::vector<Cycle>& basisCycles);
+    void buildNonContractibleCycles(std::vector<BasisCycle>& basisCycles);
     
     // builds basis cycles
     void buildBasisCycles();
     
     // sets up A and K 
     void setup();
+    
+    // constructs direction fields given adjustment angles
+    void constructDirectionFields();
 
     Eigen::SPQR<Eigen::SparseMatrix<double>> solver;
-    Eigen::SparseMatrix<double> A;
     Eigen::VectorXd K;
 };
 

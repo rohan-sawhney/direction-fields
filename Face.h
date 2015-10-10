@@ -19,10 +19,7 @@ public:
     
     // field angle
     Eigen::Vector3d field;
-    
-    // flag for setting beta
-    bool visited;
-    
+        
     // returns centroid
     Eigen::Vector3d centroid() const;
         

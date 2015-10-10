@@ -51,11 +51,11 @@ int Mesh::eulerCharacteristic() const
     return (int)(vertices.size() - edges.size() + faces.size());
 }
 
-void Mesh::buildContractibleCycles(std::vector<Cycle>& basisCycles)
+void Mesh::buildContractibleCycles(std::vector<BasisCycle>& basisCycles)
 {
     for (VertexCIter v = vertices.begin(); v!= vertices.end(); v++) {
         // add halfedges to cycle
-        Cycle cycle;
+        BasisCycle cycle;
         HalfEdgeIter he = v->he;
         do {
             cycle.push_back(he);
@@ -131,7 +131,7 @@ void Mesh::buildDualSpanningTree()
     }
 }
 
-void Mesh::buildNonContractibleCycles(std::vector<Cycle>& basisCycles)
+void Mesh::buildNonContractibleCycles(std::vector<BasisCycle>& basisCycles)
 {
     generators.clear();
     buildPrimalSpanningTree();
@@ -141,11 +141,11 @@ void Mesh::buildNonContractibleCycles(std::vector<Cycle>& basisCycles)
         
         HalfEdgeIter he = e->he;
         if (!he->inPrimalSpanningTree() && !he->inDualSpanningTree()) {
-            Cycle cycle;
+            BasisCycle cycle;
             cycle.push_back(he);
                 
             // trace loop in both directions
-            Cycle temp1;
+            BasisCycle temp1;
             FaceCIter f = he->flip->face;
             while (f != f->parent) {
                 FaceCIter fp = f->parent;
@@ -153,7 +153,7 @@ void Mesh::buildNonContractibleCycles(std::vector<Cycle>& basisCycles)
                 f = fp;
             }
             
-            Cycle temp2;
+            BasisCycle temp2;
             f = he->face;
             while (f != f->parent) {
                 FaceCIter fp = f->parent;
@@ -186,12 +186,12 @@ void Mesh::buildNonContractibleCycles(std::vector<Cycle>& basisCycles)
 
 void Mesh::buildBasisCycles()
 {
-    std::vector<Cycle> basisCycles;
+    std::vector<BasisCycle> basisCycles;
     buildContractibleCycles(basisCycles);
     buildNonContractibleCycles(basisCycles);
     
     // build A
-    A.resize((int)basisCycles.size(), (int)edges.size());
+    Eigen::SparseMatrix<double> A((int)basisCycles.size(), (int)edges.size());
     A.setZero();
     
     std::vector<Eigen::Triplet<double>> ATriplet;
@@ -224,13 +224,13 @@ double parallelTransport(double angle, HalfEdgeIter& he)
     
     // subtract delta ij
     he->face->axis(x, y);
-    angle -= atan2(v.dot(y), v.dot(x));
+    double deltaIJ = atan2(v.dot(y), v.dot(x));
     
     // subtract delta ji
     he->flip->face->axis(x, y);
-    angle += atan2(v.dot(y), v.dot(x));
+    double deltaJI = atan2(v.dot(y), v.dot(x));
     
-    return angle;
+    return angle - deltaIJ + deltaJI;
 }
 
 void Mesh::setup()
@@ -239,9 +239,9 @@ void Mesh::setup()
     buildBasisCycles();
 
     // compute angle defects
-    K.resize(A.rows());
     size_t v = vertices.size();
-    for (size_t i = 0; i < A.rows(); i++) {
+    K.resize(v + generators.size());
+    for (size_t i = 0; i < v + generators.size(); i++) {
         if (i < v) {
             K(i) = -vertices[i].angleDefect();
             
@@ -260,13 +260,51 @@ void Mesh::setup()
     }
 }
 
+void Mesh::constructDirectionFields()
+{
+    for (FaceIter f = faces.begin(); f != faces.end(); f++) {
+        f->parent = f;
+    }
+    
+    // traverse faces in any order
+    FaceIter root = faces.begin() + (rand() % faces.size());
+    root->beta = 0;
+    std::queue<FaceIter> queue;
+    queue.push(root);
+    
+    while (!queue.empty()) {
+        FaceIter f1 = queue.front();
+        queue.pop();
+        
+        HalfEdgeIter he = f1->he;
+        do {
+            FaceIter f2 = he->flip->face;
+            if (f2 != root && f2->parent == f2) {
+                f2->parent = f1;
+                double phi = he == he->edge->he ? he->edge->phi : -he->edge->phi;
+                f2->beta = parallelTransport(f1->beta, he) - phi;
+                queue.push(f2);
+            }
+            
+            he = he->next;
+            
+        } while (he != f1->he);
+    }
+    
+    for (FaceIter f = faces.begin(); f != faces.end(); f++) {
+        Eigen::Vector3d localField(cos(f->beta), sin(f->beta), 0);
+        Eigen::Vector3d x, y; f->axis(x, y);
+        f->field = localField.x()*x + localField.y()*y;
+    }
+}
+
 void Mesh::solve(const std::vector<double>& generatorKs)
 {
     // set singularities
     double sum = 0;
     size_t v = vertices.size();
     Eigen::VectorXd b(K.rows()); 
-    for (size_t i = 0; i < A.rows(); i++) {
+    for (size_t i = 0; i < v + generators.size(); i++) {
         if (i < v) {
             b(i) = K(i) + 2 * M_PI * vertices[i].k;
             sum += vertices[i].k;
@@ -290,39 +328,7 @@ void Mesh::solve(const std::vector<double>& generatorKs)
     }
     
     // construct direction fields
-    FaceIter root = faces.begin() + (rand() % faces.size());
-    root->visited = true;
-    root->beta = M_PI;
-    std::queue<FaceIter> queue;
-    queue.push(root);
-    
-    while (!queue.empty()) {
-        FaceIter f = queue.front();
-        queue.pop();
-        
-        HalfEdgeIter he = f->he;
-        do {
-            FaceIter neighbor = he->flip->face;
-            if (!neighbor->visited) {
-                neighbor->beta = parallelTransport(f->beta, he->flip) - he->edge->phi;
-                neighbor->visited = true;
-                queue.push(neighbor);
-            }
-            
-            he = he->next;
-            
-        } while (he != f->he);
-    }
-    
-    for (FaceIter f = faces.begin(); f != faces.end(); f++) {
-        while (f->beta >=  M_PI) f->beta -= 2 * M_PI;
-        while (f->beta <  -M_PI) f->beta += 2 * M_PI;
-        
-        Eigen::Vector3d n = f->normal().normalized();
-        Eigen::Vector3d x = (f->he->next->vertex->position - f->he->vertex->position).normalized();
-        if (f->he != f->he->edge->he) n = -n;
-        f->field = x*cos(f->beta) + n.cross(x)*sin(f->beta) + n*(n.dot(x))*(1-cos(f->beta));
-    }
+    constructDirectionFields();
 }
 
 void Mesh::normalize()

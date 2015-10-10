@@ -26,3 +26,4 @@ double Vertex::angleDefect() const
     
     return defect;
 }
+

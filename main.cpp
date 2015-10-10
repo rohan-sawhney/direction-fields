@@ -18,13 +18,13 @@ double y = 0;
 double z = -2.5;
 
 std::string path = "/Users/rohansawhney/Desktop/developer/C++/direction-fields/kitten.obj";
-    
+
 Mesh mesh;
 double avgEdgeLength = 0;
 bool success = true;
-bool showBasisCycles = true;
+bool showBasisCycles = false;
 bool setGeneratorIndices = false;
-int singularities = 5;
+int singularities = 2;
 std::vector<double> generatorKs;
 
 void printInstructions()
@@ -120,6 +120,7 @@ void drawBasisCycles()
 {
     // draw primal tree
     glColor4f(0.0, 0.0, 1.0, 0.5);
+    glLineWidth(3.0);
     glLineWidth(1.0);
     glBegin(GL_LINES);
     for (VertexCIter v = mesh.vertices.begin(); v != mesh.vertices.end(); v++){
@@ -161,17 +162,23 @@ void drawBasisCycles()
 void drawDirectionFields()
 {
     // draw direction fields
-    glLineWidth(1.0);
     glColor4f(0.0, 0.0, 1.0, 0.5);
-    glBegin(GL_LINES);
     for (FaceIter f = mesh.faces.begin(); f != mesh.faces.end(); f++) {
 
-        Eigen::Vector3d centroid = f->centroid();
-        Eigen::Vector3d direction = centroid + f->field*avgEdgeLength*0.5;
-        glVertex3d(centroid.x(), centroid.y(), centroid.z());
-        glVertex3d(direction.x(), direction.y(), direction.z());
+        Eigen::Vector3d start = f->centroid();
+        Eigen::Vector3d end = start + f->field*avgEdgeLength * 0.75;
+        
+        glLineWidth(1.5);
+        glBegin(GL_LINES);
+        glVertex3d(start.x(), start.y(), start.z());
+        glVertex3d(end.x(), end.y(), end.z());
+        glEnd();
+        
+        glPointSize(2.5);
+        glBegin(GL_POINTS);
+        glVertex3d(end.x(), end.y(), end.z());
+        glEnd();
     }
-    glEnd();
     
     // draw singularities
     glColor4f(1.0, 0.0, 0.0, 0.5);
